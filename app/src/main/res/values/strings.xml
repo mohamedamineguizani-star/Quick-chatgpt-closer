@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Quick ChatGPT Closer</string>
+    <string name="accessibility_service_desc">Enables automatic force-stopping of ChatGPT when the panic gesture is triggered.</string>
+</resources>
