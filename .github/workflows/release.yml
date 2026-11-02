@@ -22,9 +22,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+          cache: gradle
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -46,7 +44,7 @@ jobs:
             ## Quick ChatGPT Closer v1.0.0 🚀
 
             ### Download & Install:
-            - Download `QuickChatGPTCloser-v1.0.0.apk` below and open it on your Android device.
+            - Download **`QuickChatGPTCloser-v1.0.0.apk`** below and open it on your Android phone.
 
             ### Features:
             - **Triple-tap Corner Gesture**: 90×90px touch zone in the top-right corner triggers the panic sequence.
