@@ -1,0 +1,60 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare APK Asset
+        run: |
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/release/app-release.apk release-artifacts/QuickChatGPTCloser-v1.0.0.apk
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || 'v1.0.0' }}
+          name: Quick ChatGPT Closer ${{ github.ref_name || 'v1.0.0' }}
+          body: |
+            ## Quick ChatGPT Closer v1.0.0 🚀
+
+            ### Download & Install:
+            - Download `QuickChatGPTCloser-v1.0.0.apk` below and open it on your Android device.
+
+            ### Features:
+            - **Triple-tap Corner Gesture**: 90×90px touch zone in the top-right corner triggers the panic sequence.
+            - **Silent Last Chat Deletion**: Sends background API request to delete the latest conversation in ChatGPT.
+            - **Automated Force Stop**: Automates Settings to force close ChatGPT and returns straight to your home screen.
+            - **Background Guard**: Keeps running reliably as a foreground service with battery optimization exclusions.
+          files: release-artifacts/QuickChatGPTCloser-v1.0.0.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
