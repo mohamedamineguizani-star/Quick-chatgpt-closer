@@ -31,9 +31,9 @@ object ChatGptManager {
         }
 
         try {
-            // 1. Fetch recent conversation list (limit 1 to get the most recent conversation)
+            // 1. Fetch recent conversation list (limit 2 to catch current active chat)
             val listRequest = Request.Builder()
-                .url("https://chatgpt.com/backend-api/conversations?offset=0&limit=1")
+                .url("https://chatgpt.com/backend-api/conversations?offset=0&limit=2")
                 .header("Authorization", bearer)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                 .get()
@@ -44,28 +44,30 @@ object ChatGptManager {
             val json = JSONObject(listBody)
             val items = json.optJSONArray("items") ?: return@withContext false
 
-            if (items.length() > 0) {
-                val latestId = items.getJSONObject(0).getString("id")
-                Log.d(TAG, "Found latest conversation ID: $latestId. Deleting...")
+            var success = false
+            for (i in 0 until items.length()) {
+                val convId = items.getJSONObject(i).getString("id")
+                Log.d(TAG, "Deleting conversation ID: $convId")
 
-                // 2. Hide / Delete conversation from account
                 val deletePayload = JSONObject().apply {
                     put("is_visible", false)
                 }.toString()
 
                 val patchRequest = Request.Builder()
-                    .url("https://chatgpt.com/backend-api/conversation/$latestId")
+                    .url("https://chatgpt.com/backend-api/conversation/$convId")
                     .header("Authorization", bearer)
                     .header("Content-Type", "application/json")
                     .patch(deletePayload.toRequestBody("application/json".toMediaType()))
                     .build()
 
                 val patchResponse = client.newCall(patchRequest).execute()
-                Log.d(TAG, "Delete response code: ${patchResponse.code}")
-                return@withContext patchResponse.isSuccessful
+                if (patchResponse.isSuccessful) {
+                    success = true
+                }
             }
+            return@withContext success
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting chat: ${e.message}", e)
+            Log.e(TAG, "Error deleting chat via backend: ${e.message}", e)
         }
         return@withContext false
     }

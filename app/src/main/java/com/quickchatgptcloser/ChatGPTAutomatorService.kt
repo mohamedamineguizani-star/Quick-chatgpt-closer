@@ -25,7 +25,6 @@ class ChatGPTAutomatorService : AccessibilityService() {
             if (service != null) {
                 service.startPanicSequence(context)
             } else {
-                // If service is not bound yet, immediately kill background process
                 val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                 am?.killBackgroundProcesses("com.openai.chatgpt")
             }
@@ -35,12 +34,20 @@ class ChatGPTAutomatorService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var isDeleting = false
 
+    private val newChatKeywords = listOf(
+        "new chat", "nouvelle discussion", "nuevo chat", "nuova chat", "neuer chat", "create"
+    )
+
     private val deleteKeywords = listOf(
         "delete", "delete chat", "supprimer", "eliminar", "löschen", "cancella", "verwijderen"
     )
 
     private val menuKeywords = listOf(
         "more options", "more", "options", "actions", "conversation", "menu", "plus d'options", "más opciones"
+    )
+
+    private val drawerKeywords = listOf(
+        "open navigation", "navigation drawer", "open drawer", "sidebar", "menu", "navigation"
     )
 
     override fun onServiceConnected() {
@@ -61,28 +68,30 @@ class ChatGPTAutomatorService : AccessibilityService() {
         val rootNode = rootInActiveWindow
         val currentPkg = rootNode?.packageName?.toString()
 
-        // Safety timeout: If anything takes more than 450ms, force exit to home immediately
+        // Hard safety timeout: Dismiss to home within 500ms so user is never stranded
         handler.postDelayed({
             if (isDeleting) {
                 closeAppAndGoHome(context)
             }
-        }, 450)
+        }, 500)
 
         if (currentPkg == "com.openai.chatgpt" && rootNode != null) {
-            // First check if a delete option or confirmation is already visible
+            // STEP 1: Immediately tap "New chat" so active conversation is wiped from the screen
+            clickNewChat(rootNode)
+
+            // STEP 2: Try to find and click "Delete" if options are already visible
             if (findAndClickDelete(rootNode)) {
-                handler.postDelayed({ closeAppAndGoHome(context) }, 100)
+                handler.postDelayed({ closeAppAndGoHome(context) }, 120)
                 return
             }
 
-            // Click the options menu in ChatGPT
-            val menuClicked = clickMenuButton(rootNode)
-            if (!menuClicked) {
-                // If menu icon isn't found, close directly
-                closeAppAndGoHome(context)
+            // STEP 3: Click options menu or open drawer to delete from account
+            if (clickMenuOrDrawer(rootNode)) {
+                // Event listener handles menu/drawer response
+            } else {
+                handler.postDelayed({ closeAppAndGoHome(context) }, 150)
             }
         } else {
-            // ChatGPT is not currently active on screen: immediately go home and kill background process
             closeAppAndGoHome(context)
         }
     }
@@ -94,18 +103,52 @@ class ChatGPTAutomatorService : AccessibilityService() {
         val currentPkg = rootNode.packageName?.toString()
 
         if (currentPkg == "com.openai.chatgpt") {
-            // Once the popup menu or delete confirmation dialog appears, click Delete
+            // If delete button appears in popup or confirmation dialog, click it
             if (findAndClickDelete(rootNode)) {
-                // Short 80ms delay to let the action dispatch, then dismiss to Home
                 handler.postDelayed({
                     closeAppAndGoHome(applicationContext)
                 }, 80)
+            } else {
+                // If drawer opened, long-press the first conversation item
+                longClickFirstHistoryItem(rootNode)
             }
         }
     }
 
-    private fun clickMenuButton(rootNode: AccessibilityNodeInfo): Boolean {
-        // Method 1: Search by content-description or text
+    private fun clickNewChat(rootNode: AccessibilityNodeInfo): Boolean {
+        for (kw in newChatKeywords) {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(kw)
+            for (node in nodes) {
+                if (clickNodeOrParent(node)) return true
+            }
+        }
+
+        val screenWidth = getScreenWidth()
+        val bounds = Rect()
+
+        fun searchTopRightCompose(node: AccessibilityNodeInfo?): Boolean {
+            if (node == null) return false
+            node.getBoundsInScreen(bounds)
+
+            if (bounds.top in 0..350 && bounds.right > screenWidth * 0.5) {
+                val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+                for (kw in newChatKeywords) {
+                    if (desc.contains(kw)) {
+                        if (clickNodeOrParent(node)) return true
+                    }
+                }
+            }
+            for (i in 0 until node.childCount) {
+                if (searchTopRightCompose(node.getChild(i))) return true
+            }
+            return false
+        }
+
+        return searchTopRightCompose(rootNode)
+    }
+
+    private fun clickMenuOrDrawer(rootNode: AccessibilityNodeInfo): Boolean {
+        // Try top-right "..." menu
         for (keyword in menuKeywords) {
             val nodes = rootNode.findAccessibilityNodeInfosByText(keyword)
             for (node in nodes) {
@@ -113,34 +156,49 @@ class ChatGPTAutomatorService : AccessibilityService() {
             }
         }
 
-        // Method 2: Search top-right area for the 3-dots / action button
-        val screenWidth = getScreenWidth()
+        // Try top-left drawer icon
         val bounds = Rect()
-
-        fun searchTopRight(node: AccessibilityNodeInfo?): Boolean {
+        fun searchTopLeftDrawer(node: AccessibilityNodeInfo?): Boolean {
             if (node == null) return false
             node.getBoundsInScreen(bounds)
 
-            // Top right app bar zone: top < 350px, right > 60% of screen width
-            if (bounds.top in 0..350 && bounds.right > screenWidth * 0.6) {
+            if (bounds.top in 0..350 && bounds.left < 250) {
                 val desc = node.contentDescription?.toString()?.lowercase() ?: ""
-                for (kw in menuKeywords) {
+                for (kw in drawerKeywords) {
                     if (desc.contains(kw)) {
                         if (clickNodeOrParent(node)) return true
                     }
                 }
-                if (node.isClickable && bounds.width() in 30..300 && bounds.height() in 30..300) {
+                if (node.isClickable && bounds.width() in 30..250 && bounds.height() in 30..250) {
                     if (clickNodeOrParent(node)) return true
                 }
             }
-
             for (i in 0 until node.childCount) {
-                if (searchTopRight(node.getChild(i))) return true
+                if (searchTopLeftDrawer(node.getChild(i))) return true
             }
             return false
         }
 
-        return searchTopRight(rootNode)
+        return searchTopLeftDrawer(rootNode)
+    }
+
+    private fun longClickFirstHistoryItem(rootNode: AccessibilityNodeInfo): Boolean {
+        val bounds = Rect()
+        fun searchFirstListItem(node: AccessibilityNodeInfo?): Boolean {
+            if (node == null) return false
+            node.getBoundsInScreen(bounds)
+
+            if (bounds.top in 200..600 && bounds.left < 400 && node.isClickable) {
+                if (node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK)) {
+                    return true
+                }
+            }
+            for (i in 0 until node.childCount) {
+                if (searchFirstListItem(node.getChild(i))) return true
+            }
+            return false
+        }
+        return searchFirstListItem(rootNode)
     }
 
     private fun findAndClickDelete(rootNode: AccessibilityNodeInfo): Boolean {
@@ -174,10 +232,10 @@ class ChatGPTAutomatorService : AccessibilityService() {
         isDeleting = false
         handler.removeCallbacksAndMessages(null)
 
-        // 1. Immediately press Home (vanishes ChatGPT without ever opening Settings)
+        // 1. Immediately press Home (returns to home screen)
         performGlobalAction(GLOBAL_ACTION_HOME)
 
-        // 2. Terminate ChatGPT background processes
+        // 2. Kill background process so ChatGPT does not retain active activity in RAM
         try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
             am?.killBackgroundProcesses("com.openai.chatgpt")
