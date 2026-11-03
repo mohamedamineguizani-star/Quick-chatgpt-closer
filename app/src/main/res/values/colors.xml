@@ -5,6 +5,7 @@
     <color name="primary">#10A37F</color>
     <color name="primary_dark">#0E8A6B</color>
     <color name="accent">#FF5252</color>
+    <color name="claude">#D97757</color>
     <color name="background">#121212</color>
     <color name="surface">#1E1E1E</color>
     <color name="text_primary">#F1F1F1</color>

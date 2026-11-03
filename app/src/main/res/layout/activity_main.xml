@@ -14,7 +14,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Quick ChatGPT Closer"
+            android:text="Quick AI Closer"
             android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:textStyle="bold"
@@ -23,12 +23,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Triple-tap the top-right red badge to instantly close ChatGPT and delete the last conversation via API."
+            android:text="Triple-tap the top-right red badge to instantly force close Claude or ChatGPT, remove them from active apps (Recents), and wipe cloud chats."
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:layout_marginBottom="16dp" />
 
-        <!-- 1. ChatGPT API Token Card (PRIMARY) -->
+        <!-- 1. Target App Selection Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -47,7 +47,271 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="1. ChatGPT Account API Token"
+                    android:text="1. Target App Detection"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Select which app to force close and remove from the active apps list:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioGroup
+                    android:id="@+id/rgTargetApp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <RadioButton
+                        android:id="@+id/rbTargetAuto"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="⚡ Auto-Detect (Claude or ChatGPT)"
+                        android:textColor="@color/text_primary"
+                        android:checked="true"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbTargetClaude"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🟣 Claude (com.anthropic.claude)"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbTargetChatGPT"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🟢 ChatGPT (com.openai.chatgpt)"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbTargetLastActive"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="📱 Any Last Active App"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+                </RadioGroup>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 2. Panic Cleaner Behavior Options -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="0dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="2. Panic Closer Actions"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Remove from Active Apps (Recents) -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchRemoveFromRecents"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Remove From Active App List (Recents)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Opens Recents and flings the app card away so no active snapshot or card remains in the multitasker."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginBottom="14dp" />
+
+                <!-- Deep Force Stop Option -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchDeepForceStop"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Deep System Force-Stop (Settings Automation)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Opens App Details in Settings and automatically clicks 'Force stop' and confirms OK to kill all processes and alarms."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginBottom="14dp" />
+
+                <!-- Wipe History Option -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchWipeHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Purge Multiple Recent Chats (Top 5)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wipes multiple recent conversations from cloud history via API so no trace remains in sidebar."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 3. Claude API / Session Token Card (OPTIONAL) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/claude"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3. Claude Account Token (Optional)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Allows deleting Claude conversations directly on Anthropic servers upon panic."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="10dp" />
+
+                <Button
+                    android:id="@+id/btnOpenClaudePage"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🌐 Open Claude.ai in Browser"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="10dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Paste Claude sessionKey (sk-ant-sid01-...)"
+                    app:boxBackgroundColor="#2A2A2A"
+                    app:boxStrokeColor="@color/claude"
+                    android:textColorHint="@color/text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/claudeTokenEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:inputType="textMultiLine"
+                        android:maxLines="3"
+                        android:textSize="12sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp">
+
+                    <Button
+                        android:id="@+id/btnSaveClaudeToken"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Save Claude"
+                        android:backgroundTint="@color/claude"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnTestClaudeConnection"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🔌 Test Claude"
+                        android:textColor="@color/claude"
+                        app:strokeColor="@color/claude"
+                        android:layout_marginStart="6dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvClaudeConnectionResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Claude Status: Not configured"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginTop="8dp" />
+
+                <Button
+                    android:id="@+id/btnTestDeleteClaudeChat"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🗑️ Test: Delete Last Claude Chat"
+                    android:textColor="@color/claude"
+                    android:textSize="12sp"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 4. ChatGPT Account Token Card (OPTIONAL) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/primary"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4. ChatGPT Account Token (Optional)"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold"
@@ -99,7 +363,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Save Token"
+                        android:text="Save ChatGPT"
                         android:backgroundTint="@color/primary"
                         android:layout_marginEnd="6dp" />
 
@@ -109,7 +373,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="🔌 Test Token"
+                        android:text="🔌 Test ChatGPT"
                         android:textColor="@color/primary"
                         app:strokeColor="@color/primary"
                         android:layout_marginStart="6dp" />
@@ -119,7 +383,7 @@
                     android:id="@+id/tvConnectionResult"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Status: Not tested"
+                    android:text="ChatGPT Status: Not tested"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp" />
@@ -129,7 +393,7 @@
                     style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="🗑️ Test: Delete Last Chat Right Now"
+                    android:text="🗑️ Test: Delete Last ChatGPT Chat"
                     android:textColor="@color/accent"
                     android:textSize="12sp"
                     android:layout_marginTop="4dp" />
@@ -137,7 +401,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. System Permissions Overview Card -->
+        <!-- 5. System Permissions Overview Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -155,7 +419,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="2. System Permissions"
+                    android:text="5. System Permissions"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold"
@@ -287,69 +551,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Panic Options Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="12dp"
-            app:cardBackgroundColor="@color/surface"
-            app:strokeWidth="0dp"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="3. Panic Cleaner Behavior"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
-
-                <!-- Wipe History Option -->
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchWipeHistory"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Purge Multiple Recent Chats (Top 5)"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp"
-                    android:checked="true" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Wipes multiple recent conversations from OpenAI history so no trace remains in the sidebar."
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
-                    android:layout_marginBottom="14dp" />
-
-                <!-- Deep Force Stop Option -->
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchDeepForceStop"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Deep System Force-Stop"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp"
-                    android:checked="true" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Kills ChatGPT process, clears task snapshot, and returns directly to your phone's main apps menu."
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 4. Start Guard Button -->
+        <!-- 6. Start Guard Button -->
         <Button
             android:id="@+id/btnToggleService"
             android:layout_width="match_parent"
@@ -360,13 +562,13 @@
             android:textStyle="bold"
             android:layout_marginBottom="10dp" />
 
-        <!-- 5. Direct Panic Test -->
+        <!-- 7. Direct Panic Test -->
         <Button
             android:id="@+id/btnTestPanic"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="⚡ Test Panic Action (Wipe and Force Close)"
+            android:text="⚡ Test Panic Action (Close &amp; Clear Active App)"
             android:textColor="@color/accent"
             app:strokeColor="@color/accent"
             android:layout_marginBottom="24dp" />

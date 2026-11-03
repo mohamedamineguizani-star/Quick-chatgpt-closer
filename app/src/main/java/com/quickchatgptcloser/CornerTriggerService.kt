@@ -194,19 +194,27 @@ class CornerTriggerService : Service() {
 
     private fun executePanicActions() {
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        val token = prefs.getString("chatgpt_token", "") ?: ""
+        val chatgptToken = prefs.getString("chatgpt_token", "") ?: ""
+        val claudeToken = prefs.getString("claude_token", "") ?: ""
         val wipeRecentHistory = prefs.getBoolean("wipe_recent_history", true)
+        val countToDelete = if (wipeRecentHistory) 5 else 1
 
-        if (token.isNotBlank()) {
+        if (chatgptToken.isNotBlank()) {
             serviceScope.launch {
-                val countToDelete = if (wipeRecentHistory) 5 else 1
-                ChatGptManager.deleteChats(token, countToDelete)
+                ChatGptManager.deleteChats(chatgptToken, countToDelete)
             }
         }
 
-        // 1. Removes ChatGPT completely from the Android Active App List (Recents / Multitasker)
-        // 2. Destroys activity snapshot and terminates the process
-        // 3. Exits cleanly to Home Screen / Phone Apps Menu
+        if (claudeToken.isNotBlank()) {
+            serviceScope.launch {
+                ClaudeManager.deleteChats(claudeToken, countToDelete)
+            }
+        }
+
+        // 1. Removes the target app (Claude / ChatGPT / active app) completely from Android Active App List (Recents)
+        // 2. Automates deep system Force Stop via Settings
+        // 3. Destroys activity snapshot and terminates the background process
+        // 4. Exits cleanly to Home Screen
         ChatGPTAutomatorService.executeWipeAndRemoveFromRecents(applicationContext)
     }
 
@@ -230,8 +238,8 @@ class CornerTriggerService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Quick ChatGPT Closer Active")
-            .setContentText("Triple-tap top-right red badge to panic close ChatGPT.")
+            .setContentTitle("Quick Closer Guard Active")
+            .setContentText("Triple-tap top-right red badge to force close & clear Claude / ChatGPT.")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pendingIntent)

@@ -1,24 +1,28 @@
-# Quick ChatGPT Closer 🚀
+# Quick AI Closer (ChatGPT & Claude) 🚀
 
-An Android utility that runs in the background, listens for a quick **triple-tap in the top-right corner of your screen**, instantly **deletes your latest conversation in ChatGPT**, and **force-closes the ChatGPT app** via automated Android settings.
+An Android utility that runs in the background, listens for a quick **triple-tap in the top-right corner of your screen**, instantly **removes the active AI app (Claude or ChatGPT) from Android's active apps / Recents list**, executes a **deep system Force-Stop**, and **deletes conversations directly via API**.
 
 ---
 
 ## ⚡ How It Works
 
 1. **Persistent Background Guard**: Runs as a lightweight Android `ForegroundService` with battery optimization exclusions, ensuring it is never killed by Android OS.
-2. **Discreet Corner Trigger**: Displays a tiny 90×90px touch surface in the top-right corner of the screen. Tapping it 3 times within 600ms activates the panic sequence.
-3. **Silent Background Chat Deletion**: Sends an encrypted, direct HTTP PATCH request to ChatGPT's backend (`https://chatgpt.com/backend-api/conversation/<id>`) to immediately delete or hide the last active conversation.
-4. **Automated Force Stop**: Uses an `AccessibilityService` to open ChatGPT's App Details page in Android Settings, automatically clicks **"Force stop"**, confirms the system dialog, and returns immediately to the Home screen—all within ~150–200 milliseconds.
+2. **Discreet Corner Trigger**: Displays a discreet touch surface in the top-right corner of the screen. Tapping it 3 times activates the panic sequence.
+3. **Auto-Detects Active AI App**: Seamlessly targets **Claude** (`com.anthropic.claude`), **ChatGPT** (`com.openai.chatgpt`), or any last active foreground app.
+4. **Removes From Active App List (Recents)**: Automatically opens Android's task switcher (Recents) and swipes away the active app card (or clicks "Clear all"), ensuring no task snapshot remains in the multitasker.
+5. **Automated Deep System Force-Stop**: Uses an `AccessibilityService` to open the app's details page in Android Settings, clicks **"Force stop"**, confirms the system dialog, and returns cleanly to the Home screen—all within ~300–400 milliseconds.
+6. **Silent Cloud Conversation Deletion (Optional)**:
+   - **ChatGPT**: Direct HTTP PATCH request to delete/hide recent conversations.
+   - **Claude**: Direct HTTP DELETE request to wipe recent conversations from Claude.ai.
 
 ---
 
 ## 📱 Permissions Required
 
-Because Android security strictly prevents regular apps from secretly killing other apps or reading full-screen touch events, this app requires standard Android permission grants:
+Because Android security prevents regular apps from terminating other apps or reading full-screen touch events, this app requires standard Android permission grants:
 
-1. **Display over other apps (`SYSTEM_ALERT_WINDOW`)**: Required to place the discreet corner touch zone on the screen.
-2. **Accessibility Service (`BIND_ACCESSIBILITY_SERVICE`)**: Required to automate clicking the "Force stop" and confirmation buttons in Settings.
+1. **Display over other apps (`SYSTEM_ALERT_WINDOW`)**: Places the discreet corner touch zone on the screen.
+2. **Accessibility Service (`BIND_ACCESSIBILITY_SERVICE`)**: Automates dismissing the card from Recents and clicking "Force stop" in Settings.
 3. **Battery Optimization Exemption**: Ensures Android doesn't put the guard service to sleep when idle.
 
 ---
@@ -36,7 +40,8 @@ Quick-chatgpt-closer/
 │       │   ├── MainActivity.kt
 │       │   ├── CornerTriggerService.kt
 │       │   ├── ChatGPTAutomatorService.kt
-│       │   └── ChatGptManager.kt
+│       │   ├── ChatGptManager.kt
+│       │   └── ClaudeManager.kt
 │       └── res/
 │           ├── layout/activity_main.xml
 │           ├── xml/accessibility_service_config.xml
@@ -50,21 +55,25 @@ Quick-chatgpt-closer/
 
 ## 🚀 Setup & Installation
 
-1. Open this project in **Android Studio**.
-2. Connect your Android device (or launch an emulator) and click **Run (Shift + F10)**.
-3. In the app:
-   - Tap **"1. Allow Display Over Other Apps"** and toggle the permission on.
-   - Tap **"2. Enable Accessibility Service"**, find **Quick ChatGPT Closer** under Installed Services / Accessibility, and turn it on.
-   - Tap **"3. Ignore Battery Optimization"** so the service remains active indefinitely.
-   - *(Optional)* Paste your ChatGPT Bearer token to enable backend conversation deletion.
+1. Open this project in **Android Studio** or download the latest release APK.
+2. In the app:
+   - Tap **"Grant"** for Display Over Other Apps.
+   - Tap **"Enable"** for Accessibility Service (**Quick AI Closer**).
+   - Tap **"Ignore"** for Battery Optimization.
+   - *(Optional)* Configure Claude `sessionKey` and/or ChatGPT `accessToken` for cloud history wipe.
    - Tap **"Start Panic Closer Guard"**.
 
 ---
 
-## 🔒 Obtaining Your ChatGPT Session Token (Optional)
+## 🔒 Obtaining Account Session Tokens (Optional)
 
-1. Open [chatgpt.com](https://chatgpt.com) in your web browser and log in.
-2. Press `F12` to open Developer Tools and select the **Network** tab.
-3. Send any prompt or refresh the page, click on any request to `backend-api`, and view **Request Headers**.
-4. Copy the value of the `Authorization` header (`Bearer eyJhbGciOi...`).
-5. Paste it into the token field in the app and tap **Save Token**.
+### Claude (claude.ai):
+1. Open [claude.ai](https://claude.ai) in your browser and log in.
+2. Press `F12` -> **Application / Storage** -> **Cookies**.
+3. Copy the value of the `sessionKey` cookie (starts with `sk-ant-sid01-...`).
+4. Paste it into the Claude field in the app and tap **Save Claude**.
+
+### ChatGPT (chatgpt.com):
+1. Open [chatgpt.com/api/auth/session](https://chatgpt.com/api/auth/session) in your browser.
+2. Copy the `accessToken` value.
+3. Paste it into the ChatGPT field in the app and tap **Save ChatGPT**.
