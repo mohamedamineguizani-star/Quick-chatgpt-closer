@@ -3,20 +3,19 @@ package com.quickchatgptcloser
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
-import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object ClaudeManager {
 
     private const val TAG = "ClaudeManager"
+    private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     private fun formatCookie(token: String): String {
@@ -28,54 +27,84 @@ object ClaudeManager {
         }
     }
 
-    private fun getFirstOrgId(token: String): String? {
-        val request = Request.Builder()
-            .url("https://claude.ai/api/organizations")
-            .header("Cookie", formatCookie(token))
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-            .header("Accept", "application/json")
-            .get()
-            .build()
+    private fun formatBearer(token: String): String {
+        val trimmed = token.trim()
+        return if (trimmed.startsWith("Bearer ", ignoreCase = true)) {
+            trimmed
+        } else {
+            "Bearer $trimmed"
+        }
+    }
 
-        val response = client.newCall(request).execute()
+    private fun applyAuthHeaders(builder: Request.Builder, token: String) {
+        val trimmed = token.trim()
+
+        // Standard browser & CORS spoofing headers
+        builder.header("User-Agent", USER_AGENT)
+        builder.header("Accept", "application/json, text/plain, */*")
+        builder.header("Accept-Language", "en-US,en;q=0.9")
+        builder.header("Referer", "https://claude.ai/")
+        builder.header("Origin", "https://claude.ai")
+        builder.header("Sec-Fetch-Dest", "empty")
+        builder.header("Sec-Fetch-Mode", "cors")
+        builder.header("Sec-Fetch-Site", "same-origin")
+
+        // 1. Cookie Header (for sessionKey)
+        if (trimmed.contains("sessionKey") || trimmed.startsWith("sk-ant-sid")) {
+            builder.header("Cookie", formatCookie(trimmed))
+        }
+
+        // 2. Authorization Header (for Bearer or session token)
+        builder.header("Authorization", formatBearer(trimmed))
+
+        // 3. API key header (if standard Anthropic API key is provided)
+        if (trimmed.startsWith("sk-ant-api")) {
+            builder.header("x-api-key", trimmed)
+            builder.header("anthropic-version", "2023-06-01")
+        }
+    }
+
+    private fun getFirstOrgId(token: String): String? {
+        val reqBuilder = Request.Builder()
+            .url("https://claude.ai/api/organizations")
+            .get()
+        applyAuthHeaders(reqBuilder, token)
+
+        val response = client.newCall(reqBuilder.build()).execute()
         val body = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {
-            Log.e(TAG, "Failed to get orgs: HTTP ${response.code} $body")
+            Log.e(TAG, "Failed to get Claude organizations: HTTP ${response.code} $body")
             return null
         }
 
         val array = JSONArray(body)
         if (array.length() > 0) {
-            val firstOrg = array.getJSONObject(0)
-            return firstOrg.optString("uuid")
+            return array.getJSONObject(0).optString("uuid")
         }
         return null
     }
 
     suspend fun testConnection(token: String): Result<String> = withContext(Dispatchers.IO) {
         if (token.isBlank()) {
-            return@withContext Result.failure(Exception("Claude sessionKey cannot be empty"))
+            return@withContext Result.failure(Exception("Claude token cannot be empty"))
         }
 
         try {
             val orgId = getFirstOrgId(token)
-                ?: return@withContext Result.failure(Exception("Invalid sessionKey or no Claude organization found. Copy fresh sessionKey cookie from claude.ai."))
+                ?: return@withContext Result.failure(Exception("Could not connect to Claude: Invalid token or no organization found. Ensure you copied your sessionKey or Bearer token from claude.ai."))
 
-            val request = Request.Builder()
-                .url("https://claude.ai/api/organizations/$orgId/chat_conversations")
-                .header("Cookie", formatCookie(token))
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                .header("Accept", "application/json")
+            val reqBuilder = Request.Builder()
+                .url("https://claude.ai/api/organizations/$orgId/chat_conversations?limit=1")
                 .get()
-                .build()
+            applyAuthHeaders(reqBuilder, token)
 
-            val response = client.newCall(request).execute()
+            val response = client.newCall(reqBuilder.build()).execute()
             val code = response.code
             val body = response.body?.string() ?: ""
 
             if (code == 401 || code == 403) {
-                return@withContext Result.failure(Exception("HTTP $code: Invalid or expired Claude sessionKey."))
+                return@withContext Result.failure(Exception("HTTP $code: Invalid or expired Claude token."))
             }
 
             if (!response.isSuccessful) {
@@ -96,24 +125,25 @@ object ClaudeManager {
         }
     }
 
+    /**
+     * Deletes the most recent conversations (1 for single chat, or multiple for full history wipe).
+     */
     suspend fun deleteChats(token: String, count: Int = 1): Result<Int> = withContext(Dispatchers.IO) {
         if (token.isBlank()) {
-            return@withContext Result.failure(Exception("No Claude sessionKey configured"))
+            return@withContext Result.failure(Exception("No Claude token configured"))
         }
 
         try {
             val orgId = getFirstOrgId(token)
                 ?: return@withContext Result.failure(Exception("Could not retrieve Claude organization"))
 
-            val listRequest = Request.Builder()
-                .url("https://claude.ai/api/organizations/$orgId/chat_conversations")
-                .header("Cookie", formatCookie(token))
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                .header("Accept", "application/json")
+            val fetchCount = count.coerceIn(1, 15)
+            val listBuilder = Request.Builder()
+                .url("https://claude.ai/api/organizations/$orgId/chat_conversations?limit=$fetchCount")
                 .get()
-                .build()
+            applyAuthHeaders(listBuilder, token)
 
-            val listResponse = client.newCall(listRequest).execute()
+            val listResponse = client.newCall(listBuilder.build()).execute()
             val listBody = listResponse.body?.string() ?: ""
 
             if (!listResponse.isSuccessful) {
@@ -133,17 +163,18 @@ object ClaudeManager {
                 val convUuid = target.getString("uuid")
                 val title = target.optString("name", "Untitled")
 
-                val deleteRequest = Request.Builder()
+                // Official Claude DELETE endpoint - no body required
+                val delBuilder = Request.Builder()
                     .url("https://claude.ai/api/organizations/$orgId/chat_conversations/$convUuid")
-                    .header("Cookie", formatCookie(token))
-                    .header("Content-Type", "application/json")
-                    .delete("{}".toRequestBody("application/json".toMediaType()))
-                    .build()
+                    .delete()
+                applyAuthHeaders(delBuilder, token)
 
-                val deleteResponse = client.newCall(deleteRequest).execute()
-                if (deleteResponse.isSuccessful) {
+                val deleteResponse = client.newCall(delBuilder.build()).execute()
+                if (deleteResponse.isSuccessful || deleteResponse.code == 200 || deleteResponse.code == 204) {
                     deletedCount++
-                    Log.d(TAG, "Deleted Claude conversation #$i: '$title' ($convUuid)")
+                    Log.d(TAG, "Purged Claude conversation #$i: '$title' ($convUuid)")
+                } else {
+                    Log.w(TAG, "Failed deleting Claude conversation #$i ($convUuid): HTTP ${deleteResponse.code}")
                 }
             }
 

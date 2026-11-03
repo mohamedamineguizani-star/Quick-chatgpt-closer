@@ -55,6 +55,7 @@ class ChatGPTAutomatorService : AccessibilityService() {
 
     private enum class PanicState {
         IDLE,
+        IN_APP_WIPING,
         SWIPING_RECENTS,
         FORCE_STOPPING_SETTINGS
     }
@@ -63,6 +64,18 @@ class ChatGPTAutomatorService : AccessibilityService() {
     private var currentTargetPackage: String = PKG_CHATGPT
     private var hasClickedForceStop = false
     private var hasConfirmedDialog = false
+
+    private val newChatKeywords = listOf(
+        "new chat", "start new chat", "nouvelle discussion", "nouvelle conversation", "nuevo chat", "nuova chat", "neuer chat", "create", "nouveau"
+    )
+
+    private val deleteKeywords = listOf(
+        "delete", "delete chat", "delete conversation", "supprimer", "supprimer la discussion", "supprimer la conversation", "eliminar", "eliminar chat", "löschen", "cancella", "verwijderen"
+    )
+
+    private val menuKeywords = listOf(
+        "more options", "options", "chat options", "conversation", "menu", "plus d'options", "más opciones", "weitere optionen"
+    )
 
     private val clearAllKeywords = listOf(
         "close all", "clear all", "tout fermer", "tout effacer", "cerrar todo", "borrar todo", "مسح الكل", "alle schließen", "chiudi tutto"
@@ -103,7 +116,10 @@ class ChatGPTAutomatorService : AccessibilityService() {
         "подтвердить",
         "ja",
         "si",
-        "oui"
+        "oui",
+        "delete",
+        "supprimer",
+        "eliminar"
     )
 
     private val forceStopResourceIds = listOf(
@@ -145,6 +161,26 @@ class ChatGPTAutomatorService : AccessibilityService() {
         // 2. Clear any lingering handler callbacks
         handler.removeCallbacksAndMessages(null)
 
+        // 3. If Claude or ChatGPT is currently open on screen, wipe/delete active chat first
+        val rootNode = rootInActiveWindow
+        val activePkg = rootNode?.packageName?.toString() ?: ""
+
+        if ((activePkg == PKG_CLAUDE || activePkg == PKG_CHATGPT) && rootNode != null) {
+            currentState = PanicState.IN_APP_WIPING
+            wipeActiveScreenChat(rootNode)
+
+            // Allow up to 90ms for in-app delete/new chat to execute, then proceed to Recents / Force Stop
+            handler.postDelayed({
+                if (currentState == PanicState.IN_APP_WIPING) {
+                    proceedToRecentsOrForceStop(context, removeFromRecents, deepForceStop)
+                }
+            }, 90)
+        } else {
+            proceedToRecentsOrForceStop(context, removeFromRecents, deepForceStop)
+        }
+    }
+
+    private fun proceedToRecentsOrForceStop(context: Context, removeFromRecents: Boolean, deepForceStop: Boolean) {
         if (removeFromRecents) {
             startRecentsDismissal(context, deepForceStop)
         } else if (deepForceStop) {
@@ -152,6 +188,52 @@ class ChatGPTAutomatorService : AccessibilityService() {
         } else {
             finishAndReturnHome(context)
         }
+    }
+
+    private fun wipeActiveScreenChat(rootNode: AccessibilityNodeInfo): Boolean {
+        // Step A: Immediately click New Chat if available (clears conversation text from screen)
+        clickNewChat(rootNode)
+
+        // Step B: Try to find and click "Delete" if menu was already open
+        if (findAndClickDelete(rootNode)) {
+            return true
+        }
+
+        // Step C: Click options menu ("..." / More options) to reveal Delete
+        return clickMenuButton(rootNode)
+    }
+
+    private fun clickNewChat(rootNode: AccessibilityNodeInfo): Boolean {
+        for (kw in newChatKeywords) {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(kw)
+            for (node in nodes) {
+                if (clickNodeOrParent(node)) return true
+            }
+        }
+        return false
+    }
+
+    private fun clickMenuButton(rootNode: AccessibilityNodeInfo): Boolean {
+        for (kw in menuKeywords) {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(kw)
+            for (node in nodes) {
+                if (clickNodeOrParent(node)) return true
+            }
+        }
+        return false
+    }
+
+    private fun findAndClickDelete(rootNode: AccessibilityNodeInfo): Boolean {
+        for (kw in deleteKeywords) {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(kw)
+            for (node in nodes) {
+                val text = (node.text?.toString() ?: node.contentDescription?.toString() ?: "").lowercase()
+                if (text.contains(kw) && node.isEnabled) {
+                    if (clickNodeOrParent(node)) return true
+                }
+            }
+        }
+        return false
     }
 
     private fun determineTargetPackage(mode: String): String {
@@ -317,6 +399,9 @@ class ChatGPTAutomatorService : AccessibilityService() {
         }
 
         when (currentState) {
+            PanicState.IN_APP_WIPING -> {
+                handleInAppWipingEvent()
+            }
             PanicState.SWIPING_RECENTS -> {
                 handleRecentsEvent()
             }
@@ -326,6 +411,35 @@ class ChatGPTAutomatorService : AccessibilityService() {
             PanicState.IDLE -> {
                 // Do nothing
             }
+        }
+    }
+
+    private fun handleInAppWipingEvent() {
+        val rootNode = rootInActiveWindow ?: return
+
+        // If delete button is now visible after clicking menu, click it
+        if (findAndClickDelete(rootNode)) {
+            val prefs = applicationContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            val removeFromRecents = prefs.getBoolean("remove_from_recents", true)
+            val deepForceStop = prefs.getBoolean("deep_force_stop", true)
+
+            handler.removeCallbacksAndMessages(null)
+            handler.postDelayed({
+                proceedToRecentsOrForceStop(applicationContext, removeFromRecents, deepForceStop)
+            }, 60)
+            return
+        }
+
+        // If delete confirmation dialog appeared, confirm it
+        if (findAndClickConfirmDialog(rootNode)) {
+            val prefs = applicationContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            val removeFromRecents = prefs.getBoolean("remove_from_recents", true)
+            val deepForceStop = prefs.getBoolean("deep_force_stop", true)
+
+            handler.removeCallbacksAndMessages(null)
+            handler.postDelayed({
+                proceedToRecentsOrForceStop(applicationContext, removeFromRecents, deepForceStop)
+            }, 60)
         }
     }
 
