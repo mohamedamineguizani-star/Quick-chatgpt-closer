@@ -21,12 +21,16 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+
+    private val mainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private lateinit var tokenEditText: TextInputEditText
     private lateinit var btnOpenAuthPage: Button
@@ -111,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             tvConnectionResult.text = "Testing connection..."
             tvConnectionResult.setTextColor(Color.parseColor("#FFD54F"))
 
-            lifecycleScope.launch {
+            mainScope.launch {
                 val result = ChatGptManager.testConnection(token)
                 result.onSuccess { title ->
                     tvConnectionResult.text = "✅ Connected to ChatGPT!\nLatest Chat: \"$title\""
@@ -135,7 +139,7 @@ class MainActivity : AppCompatActivity() {
             tvConnectionResult.text = "Deleting latest chat via API..."
             tvConnectionResult.setTextColor(Color.parseColor("#FFD54F"))
 
-            lifecycleScope.launch {
+            mainScope.launch {
                 val result = ChatGptManager.deleteLastChat(token)
                 result.onSuccess { title ->
                     tvConnectionResult.text = "✅ Successfully deleted chat:\n\"$title\""
@@ -199,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         btnTestPanic.setOnClickListener {
             val token = prefs.getString("chatgpt_token", "") ?: tokenEditText.text?.toString()?.trim() ?: ""
             if (token.isNotBlank()) {
-                lifecycleScope.launch {
+                mainScope.launch {
                     ChatGptManager.deleteLastChat(token)
                 }
             }
