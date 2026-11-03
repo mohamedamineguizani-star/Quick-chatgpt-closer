@@ -21,13 +21,20 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tokenEditText: TextInputEditText
+    private lateinit var btnOpenAuthPage: Button
     private lateinit var btnSaveToken: Button
+    private lateinit var btnTestConnection: Button
+    private lateinit var tvConnectionResult: TextView
+    private lateinit var btnTestDeleteChat: Button
+
     private lateinit var btnOverlayPermission: Button
     private lateinit var btnAccessibilityPermission: Button
     private lateinit var btnBatteryOptimization: Button
@@ -45,7 +52,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         tokenEditText = findViewById(R.id.tokenEditText)
+        btnOpenAuthPage = findViewById(R.id.btnOpenAuthPage)
         btnSaveToken = findViewById(R.id.btnSaveToken)
+        btnTestConnection = findViewById(R.id.btnTestConnection)
+        tvConnectionResult = findViewById(R.id.tvConnectionResult)
+        btnTestDeleteChat = findViewById(R.id.btnTestDeleteChat)
+
         btnOverlayPermission = findViewById(R.id.btnOverlayPermission)
         btnAccessibilityPermission = findViewById(R.id.btnAccessibilityPermission)
         btnBatteryOptimization = findViewById(R.id.btnBatteryOptimization)
@@ -66,15 +78,77 @@ class MainActivity : AppCompatActivity() {
         }
 
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        tokenEditText.setText(prefs.getString("chatgpt_token", ""))
+        val savedToken = prefs.getString("chatgpt_token", "") ?: ""
+        tokenEditText.setText(savedToken)
 
+        // 1-Click: Open ChatGPT token page in browser
+        btnOpenAuthPage.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chatgpt.com/api/auth/session"))
+                startActivity(intent)
+                Toast.makeText(this, "Copy the 'accessToken' value from the browser page", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Save Token
         btnSaveToken.setOnClickListener {
             val token = tokenEditText.text?.toString()?.trim() ?: ""
             prefs.edit().putString("chatgpt_token", token).apply()
             Toast.makeText(this, "Token saved!", Toast.LENGTH_SHORT).show()
         }
 
-        // 1. Overlay Permission
+        // Test API Connection
+        btnTestConnection.setOnClickListener {
+            val token = tokenEditText.text?.toString()?.trim() ?: ""
+            if (token.isBlank()) {
+                tvConnectionResult.text = "❌ Error: Please paste your accessToken first"
+                tvConnectionResult.setTextColor(Color.parseColor("#E57373"))
+                return@setOnClickListener
+            }
+
+            tvConnectionResult.text = "Testing connection..."
+            tvConnectionResult.setTextColor(Color.parseColor("#FFD54F"))
+
+            lifecycleScope.launch {
+                val result = ChatGptManager.testConnection(token)
+                result.onSuccess { title ->
+                    tvConnectionResult.text = "✅ Connected to ChatGPT!\nLatest Chat: \"$title\""
+                    tvConnectionResult.setTextColor(Color.parseColor("#81C784"))
+                    prefs.edit().putString("chatgpt_token", token).apply()
+                }.onFailure { err ->
+                    tvConnectionResult.text = "❌ Connection Failed:\n${err.message}"
+                    tvConnectionResult.setTextColor(Color.parseColor("#E57373"))
+                }
+            }
+        }
+
+        // Test Delete Chat via API
+        btnTestDeleteChat.setOnClickListener {
+            val token = prefs.getString("chatgpt_token", "") ?: tokenEditText.text?.toString()?.trim() ?: ""
+            if (token.isBlank()) {
+                Toast.makeText(this, "Save your token first!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            tvConnectionResult.text = "Deleting latest chat via API..."
+            tvConnectionResult.setTextColor(Color.parseColor("#FFD54F"))
+
+            lifecycleScope.launch {
+                val result = ChatGptManager.deleteLastChat(token)
+                result.onSuccess { title ->
+                    tvConnectionResult.text = "✅ Successfully deleted chat:\n\"$title\""
+                    tvConnectionResult.setTextColor(Color.parseColor("#81C784"))
+                    Toast.makeText(this@MainActivity, "Chat deleted: $title", Toast.LENGTH_SHORT).show()
+                }.onFailure { err ->
+                    tvConnectionResult.text = "❌ Delete Failed: ${err.message}"
+                    tvConnectionResult.setTextColor(Color.parseColor("#E57373"))
+                }
+            }
+        }
+
+        // Permissions
         btnOverlayPermission.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                 try {
@@ -87,26 +161,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 2. Accessibility Permission
         btnAccessibilityPermission.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            Toast.makeText(this, "Find 'Quick ChatGPT Closer' and toggle it ON", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Enable 'Quick ChatGPT Closer'", Toast.LENGTH_LONG).show()
         }
 
-        // Helper button for Android 13/14/15 Restricted Settings
         btnUnlockRestricted.setOnClickListener {
             try {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.parse("package:$packageName")
                 }
                 startActivity(intent)
-                Toast.makeText(this, "Tap the 3 dots (⋮) in the top-right corner -> 'Allow restricted settings'", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Tap the 3 dots (⋮) top-right -> 'Allow restricted settings'", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        // 3. Battery Optimization
         btnBatteryOptimization.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -116,20 +187,22 @@ class MainActivity : AppCompatActivity() {
                         data = Uri.parse("package:$packageName")
                     }
                     startActivity(intent)
-                } else {
-                    Toast.makeText(this, "Battery optimization already ignored!", Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
-        // Start / Stop Service
         btnToggleService.setOnClickListener {
             toggleService()
         }
 
-        // Direct Panic Test
+        // Test Panic Action (Close + API Delete)
         btnTestPanic.setOnClickListener {
-            Toast.makeText(this, "Testing panic action...", Toast.LENGTH_SHORT).show()
+            val token = prefs.getString("chatgpt_token", "") ?: tokenEditText.text?.toString()?.trim() ?: ""
+            if (token.isNotBlank()) {
+                lifecycleScope.launch {
+                    ChatGptManager.deleteLastChat(token)
+                }
+            }
             ChatGPTAutomatorService.executePanic(this)
         }
     }
@@ -140,7 +213,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshPermissionStates() {
-        // Overlay Check
         val hasOverlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
         if (hasOverlay) {
             tvOverlayStatus.text = "1. Overlay: ✅ Granted"
@@ -152,7 +224,6 @@ class MainActivity : AppCompatActivity() {
             btnOverlayPermission.visibility = View.VISIBLE
         }
 
-        // Accessibility Check
         val hasAccessibility = isAccessibilityServiceEnabled(this, ChatGPTAutomatorService::class.java)
         if (hasAccessibility) {
             tvAccessibilityStatus.text = "2. Accessibility: ✅ Enabled"
@@ -163,11 +234,9 @@ class MainActivity : AppCompatActivity() {
             tvAccessibilityStatus.text = "2. Accessibility: ❌ Disabled"
             tvAccessibilityStatus.setTextColor(Color.parseColor("#E57373"))
             btnAccessibilityPermission.visibility = View.VISIBLE
-            // Show the Android 13+ helper card if accessibility is not enabled
             cardRestrictedSetting.visibility = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) View.VISIBLE else View.GONE
         }
 
-        // Battery Check
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) pm.isIgnoringBatteryOptimizations(packageName) else true
         if (isIgnoringBattery) {
@@ -180,7 +249,6 @@ class MainActivity : AppCompatActivity() {
             btnBatteryOptimization.visibility = View.VISIBLE
         }
 
-        // Toggle button state
         if (CornerTriggerService.isRunning) {
             btnToggleService.text = "Stop Panic Closer Guard"
             btnToggleService.setBackgroundColor(Color.parseColor("#D32F2F"))
@@ -207,7 +275,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     startService(serviceIntent)
                 }
-                Toast.makeText(this, "Panic Closer started! Look for the red badge at top-right.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Panic Closer started! Look for red badge at top-right.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(this, "Failed to start service: ${e.message}", Toast.LENGTH_LONG).show()
             }
