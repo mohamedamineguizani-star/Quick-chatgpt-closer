@@ -304,7 +304,7 @@
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="⚡ Test Panic Action (Close & Delete)"
+            android:text="⚡ Test Panic Action (Close and Delete)"
             android:textColor="@color/accent"
             app:strokeColor="@color/accent"
             android:layout_marginBottom="24dp" />
