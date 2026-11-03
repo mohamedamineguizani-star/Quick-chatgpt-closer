@@ -14,8 +14,8 @@ object ChatGptManager {
 
     private const val TAG = "ChatGptManager"
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
         .build()
 
     private fun formatBearer(token: String): String {
@@ -45,7 +45,7 @@ object ChatGptManager {
             val body = response.body?.string() ?: ""
 
             if (code == 401 || code == 403) {
-                return@withContext Result.failure(Exception("HTTP $code: Invalid or expired token. Please log into chatgpt.com and refresh your token."))
+                return@withContext Result.failure(Exception("HTTP $code: Invalid or expired token. Open chatgpt.com/api/auth/session to copy fresh accessToken."))
             }
 
             if (!response.isSuccessful) {
@@ -59,7 +59,7 @@ object ChatGptManager {
                 val title = firstItem.optString("title", "Untitled Chat")
                 return@withContext Result.success(title)
             } else {
-                return@withContext Result.success("(No conversations in account)")
+                return@withContext Result.success("(No conversations found in account)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Connection test failed: ${e.message}", e)
@@ -67,59 +67,63 @@ object ChatGptManager {
         }
     }
 
-    suspend fun deleteLastChat(token: String): Result<String> = withContext(Dispatchers.IO) {
+    /**
+     * Deletes the most recent conversations (1 for single chat, or multiple for full history wipe).
+     */
+    suspend fun deleteChats(token: String, count: Int = 1): Result<Int> = withContext(Dispatchers.IO) {
         if (token.isBlank()) {
             return@withContext Result.failure(Exception("No token configured"))
         }
 
         try {
-            // 1. Fetch latest conversation
+            val fetchCount = count.coerceIn(1, 15)
             val listRequest = Request.Builder()
-                .url("https://chatgpt.com/backend-api/conversations?offset=0&limit=1")
+                .url("https://chatgpt.com/backend-api/conversations?offset=0&limit=$fetchCount")
                 .header("Authorization", formatBearer(token))
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                 .get()
                 .build()
 
             val listResponse = client.newCall(listRequest).execute()
-            val code = listResponse.code
             val listBody = listResponse.body?.string() ?: ""
 
             if (!listResponse.isSuccessful) {
-                return@withContext Result.failure(Exception("Failed to fetch chats: HTTP $code"))
+                return@withContext Result.failure(Exception("Fetch failed: HTTP ${listResponse.code}"))
             }
 
             val json = JSONObject(listBody)
             val items = json.optJSONArray("items")
             if (items == null || items.length() == 0) {
-                return@withContext Result.success("No chats to delete")
+                return@withContext Result.success(0)
             }
 
-            val target = items.getJSONObject(0)
-            val convId = target.getString("id")
-            val title = target.optString("title", "Untitled Chat")
-
-            // 2. Send official delete command
+            var deletedCount = 0
             val deletePayload = JSONObject().apply {
                 put("is_visible", false)
             }.toString()
 
-            val patchRequest = Request.Builder()
-                .url("https://chatgpt.com/backend-api/conversation/$convId")
-                .header("Authorization", formatBearer(token))
-                .header("Content-Type", "application/json")
-                .patch(deletePayload.toRequestBody("application/json".toMediaType()))
-                .build()
+            for (i in 0 until items.length()) {
+                val target = items.getJSONObject(i)
+                val convId = target.getString("id")
+                val title = target.optString("title", "Untitled")
 
-            val patchResponse = client.newCall(patchRequest).execute()
-            if (patchResponse.isSuccessful) {
-                Log.d(TAG, "Successfully deleted conversation '$title' ($convId)")
-                return@withContext Result.success(title)
-            } else {
-                return@withContext Result.failure(Exception("Delete failed: HTTP ${patchResponse.code}"))
+                val patchRequest = Request.Builder()
+                    .url("https://chatgpt.com/backend-api/conversation/$convId")
+                    .header("Authorization", formatBearer(token))
+                    .header("Content-Type", "application/json")
+                    .patch(deletePayload.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val patchResponse = client.newCall(patchRequest).execute()
+                if (patchResponse.isSuccessful) {
+                    deletedCount++
+                    Log.d(TAG, "Deleted conversation #$i: '$title' ($convId)")
+                }
             }
+
+            return@withContext Result.success(deletedCount)
         } catch (e: Exception) {
-            Log.e(TAG, "deleteLastChat error: ${e.message}", e)
+            Log.e(TAG, "deleteChats error: ${e.message}", e)
             return@withContext Result.failure(e)
         }
     }

@@ -195,14 +195,17 @@ class CornerTriggerService : Service() {
     private fun executePanicActions() {
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         val token = prefs.getString("chatgpt_token", "") ?: ""
+        val wipeRecentHistory = prefs.getBoolean("wipe_recent_history", true)
+        val deepForceStop = prefs.getBoolean("deep_force_stop", true)
 
         if (token.isNotBlank()) {
             serviceScope.launch {
-                ChatGptManager.deleteLastChat(token)
+                val countToDelete = if (wipeRecentHistory) 5 else 1
+                ChatGptManager.deleteChats(token, countToDelete)
             }
         }
 
-        ChatGPTAutomatorService.executePanic(applicationContext)
+        ChatGPTAutomatorService.executeDeepForceStop(applicationContext, deepForceStop)
     }
 
     private fun buildForegroundNotification(): Notification {

@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnBatteryOptimization: Button
     private lateinit var btnUnlockRestricted: Button
     private lateinit var cardRestrictedSetting: MaterialCardView
+
+    private lateinit var switchWipeHistory: SwitchMaterial
+    private lateinit var switchDeepForceStop: SwitchMaterial
+
     private lateinit var btnToggleService: Button
     private lateinit var btnTestPanic: Button
 
@@ -67,6 +72,10 @@ class MainActivity : AppCompatActivity() {
         btnBatteryOptimization = findViewById(R.id.btnBatteryOptimization)
         btnUnlockRestricted = findViewById(R.id.btnUnlockRestricted)
         cardRestrictedSetting = findViewById(R.id.cardRestrictedSetting)
+
+        switchWipeHistory = findViewById(R.id.switchWipeHistory)
+        switchDeepForceStop = findViewById(R.id.switchDeepForceStop)
+
         btnToggleService = findViewById(R.id.btnToggleService)
         btnTestPanic = findViewById(R.id.btnTestPanic)
 
@@ -84,6 +93,16 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         val savedToken = prefs.getString("chatgpt_token", "") ?: ""
         tokenEditText.setText(savedToken)
+
+        switchWipeHistory.isChecked = prefs.getBoolean("wipe_recent_history", true)
+        switchDeepForceStop.isChecked = prefs.getBoolean("deep_force_stop", true)
+
+        switchWipeHistory.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("wipe_recent_history", isChecked).apply()
+        }
+        switchDeepForceStop.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("deep_force_stop", isChecked).apply()
+        }
 
         // 1-Click: Open ChatGPT token page in browser
         btnOpenAuthPage.setOnClickListener {
@@ -136,15 +155,18 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            tvConnectionResult.text = "Deleting latest chat via API..."
+            val wipeHistory = prefs.getBoolean("wipe_recent_history", true)
+            val countToDelete = if (wipeHistory) 5 else 1
+
+            tvConnectionResult.text = "Deleting $countToDelete chat(s) from history via API..."
             tvConnectionResult.setTextColor(Color.parseColor("#FFD54F"))
 
             mainScope.launch {
-                val result = ChatGptManager.deleteLastChat(token)
-                result.onSuccess { title ->
-                    tvConnectionResult.text = "✅ Successfully deleted chat:\n\"$title\""
+                val result = ChatGptManager.deleteChats(token, countToDelete)
+                result.onSuccess { deletedCount ->
+                    tvConnectionResult.text = "✅ Successfully deleted $deletedCount chat(s) from account history!"
                     tvConnectionResult.setTextColor(Color.parseColor("#81C784"))
-                    Toast.makeText(this@MainActivity, "Chat deleted: $title", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Wiped $deletedCount chats", Toast.LENGTH_SHORT).show()
                 }.onFailure { err ->
                     tvConnectionResult.text = "❌ Delete Failed: ${err.message}"
                     tvConnectionResult.setTextColor(Color.parseColor("#E57373"))
@@ -199,15 +221,18 @@ class MainActivity : AppCompatActivity() {
             toggleService()
         }
 
-        // Test Panic Action (Close + API Delete)
+        // Test Panic Action (Wipe + Force Close + Main Menu)
         btnTestPanic.setOnClickListener {
             val token = prefs.getString("chatgpt_token", "") ?: tokenEditText.text?.toString()?.trim() ?: ""
+            val wipeHistory = prefs.getBoolean("wipe_recent_history", true)
+            val deepForceStop = prefs.getBoolean("deep_force_stop", true)
+
             if (token.isNotBlank()) {
                 mainScope.launch {
-                    ChatGptManager.deleteLastChat(token)
+                    ChatGptManager.deleteChats(token, if (wipeHistory) 5 else 1)
                 }
             }
-            ChatGPTAutomatorService.executePanic(this)
+            ChatGPTAutomatorService.executeDeepForceStop(this, deepForceStop)
         }
     }
 
@@ -219,23 +244,23 @@ class MainActivity : AppCompatActivity() {
     private fun refreshPermissionStates() {
         val hasOverlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
         if (hasOverlay) {
-            tvOverlayStatus.text = "1. Overlay: ✅ Granted"
+            tvOverlayStatus.text = "Overlay: ✅ Granted"
             tvOverlayStatus.setTextColor(Color.parseColor("#81C784"))
             btnOverlayPermission.visibility = View.GONE
         } else {
-            tvOverlayStatus.text = "1. Overlay: ❌ Not Granted"
+            tvOverlayStatus.text = "Overlay: ❌ Not Granted"
             tvOverlayStatus.setTextColor(Color.parseColor("#E57373"))
             btnOverlayPermission.visibility = View.VISIBLE
         }
 
         val hasAccessibility = isAccessibilityServiceEnabled(this, ChatGPTAutomatorService::class.java)
         if (hasAccessibility) {
-            tvAccessibilityStatus.text = "2. Accessibility: ✅ Enabled"
+            tvAccessibilityStatus.text = "Accessibility: ✅ Enabled"
             tvAccessibilityStatus.setTextColor(Color.parseColor("#81C784"))
             btnAccessibilityPermission.visibility = View.GONE
             cardRestrictedSetting.visibility = View.GONE
         } else {
-            tvAccessibilityStatus.text = "2. Accessibility: ❌ Disabled"
+            tvAccessibilityStatus.text = "Accessibility: ❌ Disabled"
             tvAccessibilityStatus.setTextColor(Color.parseColor("#E57373"))
             btnAccessibilityPermission.visibility = View.VISIBLE
             cardRestrictedSetting.visibility = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) View.VISIBLE else View.GONE
@@ -244,11 +269,11 @@ class MainActivity : AppCompatActivity() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) pm.isIgnoringBatteryOptimizations(packageName) else true
         if (isIgnoringBattery) {
-            tvBatteryStatus.text = "3. Battery: ✅ Unrestricted"
+            tvBatteryStatus.text = "Battery: ✅ Unrestricted"
             tvBatteryStatus.setTextColor(Color.parseColor("#81C784"))
             btnBatteryOptimization.visibility = View.GONE
         } else {
-            tvBatteryStatus.text = "3. Battery: ⚠️ Optimized"
+            tvBatteryStatus.text = "Battery: ⚠️ Optimized"
             tvBatteryStatus.setTextColor(Color.parseColor("#FFD54F"))
             btnBatteryOptimization.visibility = View.VISIBLE
         }

@@ -287,7 +287,69 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. Start Guard Button -->
+        <!-- Panic Options Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="0dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3. Panic Cleaner Behavior"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Wipe History Option -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchWipeHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Purge Multiple Recent Chats (Top 5)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wipes multiple recent conversations from OpenAI history so no trace remains in the sidebar."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginBottom="14dp" />
+
+                <!-- Deep Force Stop Option -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchDeepForceStop"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Deep System Force-Stop"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Kills ChatGPT process, clears task snapshot, and returns directly to your phone's main apps menu."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 4. Start Guard Button -->
         <Button
             android:id="@+id/btnToggleService"
             android:layout_width="match_parent"
@@ -298,13 +360,13 @@
             android:textStyle="bold"
             android:layout_marginBottom="10dp" />
 
-        <!-- 4. Direct Panic Test -->
+        <!-- 5. Direct Panic Test -->
         <Button
             android:id="@+id/btnTestPanic"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="⚡ Test Panic Action (Close and Delete)"
+            android:text="⚡ Test Panic Action (Wipe and Force Close)"
             android:textColor="@color/accent"
             app:strokeColor="@color/accent"
             android:layout_marginBottom="24dp" />
