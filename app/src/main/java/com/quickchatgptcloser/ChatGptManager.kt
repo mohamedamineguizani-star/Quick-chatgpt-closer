@@ -68,7 +68,7 @@ object ChatGptManager {
     }
 
     /**
-     * Deletes the most recent conversations (1 for single chat, or multiple for full history wipe).
+     * Wipes conversations by clearing titles and permanently deleting from history.
      */
     suspend fun deleteChats(token: String, count: Int = 1): Result<Int> = withContext(Dispatchers.IO) {
         if (token.isBlank()) {
@@ -98,8 +98,10 @@ object ChatGptManager {
             }
 
             var deletedCount = 0
+
             val deletePayload = JSONObject().apply {
-                put("is_visible", false)
+                put("title", " ") // Erase title so no name can ever be recovered
+                put("is_visible", false) // Erase from account history
             }.toString()
 
             for (i in 0 until items.length()) {
@@ -117,7 +119,7 @@ object ChatGptManager {
                 val patchResponse = client.newCall(patchRequest).execute()
                 if (patchResponse.isSuccessful) {
                     deletedCount++
-                    Log.d(TAG, "Deleted conversation #$i: '$title' ($convId)")
+                    Log.d(TAG, "Purged conversation #$i: '$title' ($convId)")
                 }
             }
 

@@ -196,7 +196,6 @@ class CornerTriggerService : Service() {
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         val token = prefs.getString("chatgpt_token", "") ?: ""
         val wipeRecentHistory = prefs.getBoolean("wipe_recent_history", true)
-        val deepForceStop = prefs.getBoolean("deep_force_stop", true)
 
         if (token.isNotBlank()) {
             serviceScope.launch {
@@ -205,7 +204,10 @@ class CornerTriggerService : Service() {
             }
         }
 
-        ChatGPTAutomatorService.executeDeepForceStop(applicationContext, deepForceStop)
+        // 1. Removes ChatGPT completely from the Android Active App List (Recents / Multitasker)
+        // 2. Destroys activity snapshot and terminates the process
+        // 3. Exits cleanly to Home Screen / Phone Apps Menu
+        ChatGPTAutomatorService.executeWipeAndRemoveFromRecents(applicationContext)
     }
 
     private fun buildForegroundNotification(): Notification {

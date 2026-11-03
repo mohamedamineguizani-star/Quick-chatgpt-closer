@@ -1,13 +1,12 @@
 package com.quickchatgptcloser
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.app.ActivityManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
+import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -20,10 +19,10 @@ class ChatGPTAutomatorService : AccessibilityService() {
         @Volatile
         var instance: ChatGPTAutomatorService? = null
 
-        fun executeDeepForceStop(context: Context, deepForceStop: Boolean = true) {
+        fun executeWipeAndRemoveFromRecents(context: Context) {
             val service = instance
             if (service != null) {
-                service.performForceStopAndExit(context, deepForceStop)
+                service.removeAppFromActiveListAndExit(context)
             } else {
                 // Fallback: Immediate Home + Background Kill
                 val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
@@ -33,52 +32,20 @@ class ChatGPTAutomatorService : AccessibilityService() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private var isForceStopping = false
-    private var hasClickedForceStop = false
+    private var isClearingRecents = false
 
-    // Multilingual support for "Force stop" button across Android ROMs (Samsung, Pixel, Xiaomi, etc.)
-    private val forceStopKeywords = listOf(
-        "force stop",
-        "forcer l'arrêt",
-        "forcer l'arret",
-        "forzar detención",
-        "forzar detencion",
-        "forzar cierre",
-        "إيقاف إجباري",
-        "فرض الإيقاف",
-        "beenden erzwingen",
-        "stoppen erzwingen",
-        "interrompi",
-        "arresto forzato",
-        "forçar parada",
-        "forcar parada",
-        "zorla durdur",
-        "принудительно остановить",
-        "остановить"
+    private val clearAllKeywords = listOf(
+        "close all", "clear all", "tout fermer", "tout effacer", "cerrar todo", "borrar todo", "مسح الكل", "alle schließen", "chiudi tutto"
     )
 
-    private val confirmDialogKeywords = listOf(
-        "ok",
-        "force stop",
-        "forcer l'arrêt",
-        "forzar detención",
-        "موافق",
-        "подтвердить"
-    )
-
-    private val forceStopResourceIds = listOf(
-        "button_force_stop",
-        "force_stop",
-        "right_button",
-        "button1",
-        "button3",
-        "btn_force_stop"
+    private val clearAllResourceIds = listOf(
+        "clear_all", "clear_all_button", "button_clear_all", "clear_all_recents_button", "clearAnimView"
     )
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.d(TAG, "Accessibility service connected")
+        Log.d(TAG, "Accessibility service connected with gesture capability")
     }
 
     override fun onDestroy() {
@@ -88,129 +55,109 @@ class ChatGPTAutomatorService : AccessibilityService() {
         }
     }
 
-    fun performForceStopAndExit(context: Context, deepForceStop: Boolean) {
-        // 1. Immediately drop to Home Screen (Phone Apps / Main Menu)
-        performGlobalAction(GLOBAL_ACTION_HOME)
+    fun removeAppFromActiveListAndExit(context: Context) {
+        isClearingRecents = true
 
-        // 2. Kill background processes
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        try {
-            am?.killBackgroundProcesses("com.openai.chatgpt")
-        } catch (e: Exception) {
-            Log.e(TAG, "Process kill error: ${e.message}")
-        }
+        // 1. Open the Android Active App List (Recents / Task Switcher)
+        performGlobalAction(GLOBAL_ACTION_RECENTS)
 
-        if (!deepForceStop) {
-            return
-        }
-
-        // 3. Automated Deep Force Stop via Android Settings
-        isForceStopping = true
-        hasClickedForceStop = false
-
-        // Strict 220ms safety timeout: Never leave user in Settings under any circumstance
+        // 2. Schedule automated fling gesture to swipe the active ChatGPT card away
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({
-            if (isForceStopping) {
-                finishAndReturnHome()
-            }
-        }, 220)
+            performSwipeUpToDismiss(context)
+        }, 180)
 
-        try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.parse("package:com.openai.chatgpt")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        // Safety timeout: If anything hangs, force exit to Home
+        handler.postDelayed({
+            if (isClearingRecents) {
+                isClearingRecents = false
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                killProcess(context)
             }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to launch app details: ${e.message}")
-            finishAndReturnHome()
-        }
+        }, 550)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (!isForceStopping || event == null) return
+        if (!isClearingRecents || event == null) return
 
         val rootNode = rootInActiveWindow ?: return
-        val pkg = rootNode.packageName?.toString() ?: ""
 
-        if (!pkg.contains("settings")) return
-
-        if (!hasClickedForceStop) {
-            // Step A: Find and click "Force stop" button
-            if (findAndClickForceStopButton(rootNode)) {
-                hasClickedForceStop = true
-            }
-        } else {
-            // Step B: Find and click "OK" in confirmation dialog
-            if (findAndClickConfirmDialog(rootNode)) {
-                finishAndReturnHome()
-            }
-        }
-    }
-
-    private fun findAndClickForceStopButton(rootNode: AccessibilityNodeInfo): Boolean {
-        // 1. Check by Resource ID
-        for (resId in forceStopResourceIds) {
-            val nodes = rootNode.findAccessibilityNodeInfosByViewId("com.android.settings:id/$resId")
+        // On the Recents screen, if a "Close all" / "Clear all" button is visible, click it!
+        // This removes ALL apps from the active app list and immediately drops to the home screen.
+        for (resId in clearAllResourceIds) {
+            val nodes = rootNode.findAccessibilityNodeInfosByViewId(resId)
             for (node in nodes) {
-                if (node.isEnabled && clickNodeOrParent(node)) return true
-            }
-        }
-
-        // 2. Check by Multilingual Text
-        for (keyword in forceStopKeywords) {
-            val nodes = rootNode.findAccessibilityNodeInfosByText(keyword)
-            for (node in nodes) {
-                val text = (node.text?.toString() ?: node.contentDescription?.toString() ?: "").lowercase()
-                if (text.contains(keyword) && node.isEnabled) {
-                    if (clickNodeOrParent(node)) return true
+                if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    isClearingRecents = false
+                    handler.postDelayed({
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        killProcess(applicationContext)
+                    }, 100)
+                    return
                 }
             }
         }
-        return false
-    }
 
-    private fun findAndClickConfirmDialog(rootNode: AccessibilityNodeInfo): Boolean {
-        // Check standard android dialog button1 (Positive Button: OK / Force Stop)
-        val dialogOkNodes = rootNode.findAccessibilityNodeInfosByViewId("android:id/button1")
-        for (node in dialogOkNodes) {
-            if (clickNodeOrParent(node)) return true
-        }
-
-        // Check text
-        for (keyword in confirmDialogKeywords) {
-            val nodes = rootNode.findAccessibilityNodeInfosByText(keyword)
+        for (kw in clearAllKeywords) {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(kw)
             for (node in nodes) {
-                if (clickNodeOrParent(node)) return true
+                if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    isClearingRecents = false
+                    handler.postDelayed({
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        killProcess(applicationContext)
+                    }, 100)
+                    return
+                }
             }
         }
-        return false
     }
 
-    private fun clickNodeOrParent(node: AccessibilityNodeInfo?): Boolean {
-        if (node == null) return false
-        if (node.isClickable) {
-            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    private fun performSwipeUpToDismiss(context: Context) {
+        val metrics = resources.displayMetrics
+        val screenWidth = metrics.widthPixels.toFloat()
+        val screenHeight = metrics.heightPixels.toFloat()
+
+        // Fling up from center of screen (swipes the active ChatGPT card away from the multitasker)
+        val swipePath = Path().apply {
+            moveTo(screenWidth * 0.5f, screenHeight * 0.65f)
+            lineTo(screenWidth * 0.5f, screenHeight * 0.12f)
         }
-        node.parent?.let { parent ->
-            if (parent.isClickable) {
-                return parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+
+        val stroke = GestureDescription.StrokeDescription(swipePath, 0, 160)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+
+        dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                isClearingRecents = false
+                // ChatGPT is now removed from the active app list! Exit to Home screen
+                handler.postDelayed({
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    killProcess(context)
+                }, 120)
             }
-        }
-        return false
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                isClearingRecents = false
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                killProcess(context)
+            }
+        }, null)
     }
 
-    private fun finishAndReturnHome() {
-        isForceStopping = false
-        hasClickedForceStop = false
-        handler.removeCallbacksAndMessages(null)
-
-        // Always end cleanly on Phone Apps / Home Screen
-        performGlobalAction(GLOBAL_ACTION_HOME)
+    private fun killProcess(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            am?.killBackgroundProcesses("com.openai.chatgpt")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error killing background processes: ${e.message}")
+        }
     }
 
     override fun onInterrupt() {
-        finishAndReturnHome()
+        isClearingRecents = false
+        performGlobalAction(GLOBAL_ACTION_HOME)
     }
 }

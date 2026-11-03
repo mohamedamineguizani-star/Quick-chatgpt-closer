@@ -221,18 +221,17 @@ class MainActivity : AppCompatActivity() {
             toggleService()
         }
 
-        // Test Panic Action (Wipe + Force Close + Main Menu)
+        // Test Panic Action (Wipe + Remove from Active App List + Exit Home)
         btnTestPanic.setOnClickListener {
             val token = prefs.getString("chatgpt_token", "") ?: tokenEditText.text?.toString()?.trim() ?: ""
             val wipeHistory = prefs.getBoolean("wipe_recent_history", true)
-            val deepForceStop = prefs.getBoolean("deep_force_stop", true)
 
             if (token.isNotBlank()) {
                 mainScope.launch {
                     ChatGptManager.deleteChats(token, if (wipeHistory) 5 else 1)
                 }
             }
-            ChatGPTAutomatorService.executeDeepForceStop(this, deepForceStop)
+            ChatGPTAutomatorService.executeWipeAndRemoveFromRecents(this)
         }
     }
 
