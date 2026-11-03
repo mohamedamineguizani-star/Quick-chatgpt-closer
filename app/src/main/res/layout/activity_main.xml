@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:padding="20dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,25 +16,26 @@
             android:layout_height="wrap_content"
             android:text="Quick ChatGPT Closer"
             android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textSize="22sp"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="4dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Triple-tap the top-right corner of your screen at any time to instantly force-stop ChatGPT and delete the last conversation."
+            android:text="Triple-tap the red target in the top-right corner to instantly close ChatGPT and delete the last conversation."
             android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:layout_marginBottom="24dp" />
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp" />
 
+        <!-- Status & Permission Overview Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="12dp"
             app:cardBackgroundColor="@color/surface"
             app:strokeWidth="0dp"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -45,19 +46,191 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ChatGPT Session Token"
+                    android:text="System Permissions Checklist"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Overlay Status -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/tvOverlayStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="1. Display over other apps"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnOverlayPermission"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Grant"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Accessibility Status -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/tvAccessibilityStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="2. Accessibility service"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnAccessibilityPermission"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Enable"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Battery Optimization Status -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvBatteryStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="3. Battery optimization"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnBatteryOptimization"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Ignore"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Android 13/14/15 Restricted Setting Helper Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardRestrictedSetting"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#2D2214"
+            app:strokeColor="#FF9800"
+            app:strokeWidth="1dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚠️ Switch Grayed Out? (Android 13 / 14 / 15 Fix)"
+                    android:textColor="#FFB74D"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="If Accessibility says 'Restricted setting' and won't turn on:\n1. Tap 'Unlock Restricted Settings' below.\n2. Tap the 3 dots (⋮) in the top-right corner.\n3. Tap 'Allow restricted settings' and confirm with PIN.\n4. Return and toggle Accessibility ON."
+                    android:textColor="#FFE0B2"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="3dp"
+                    android:layout_marginBottom="10dp" />
+
+                <Button
+                    android:id="@+id/btnUnlockRestricted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Unlock Restricted Settings"
+                    android:backgroundTint="#FF9800"
+                    android:textColor="#000000"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Service Start / Stop Button -->
+        <Button
+            android:id="@+id/btnToggleService"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:text="Start Panic Closer Guard"
+            android:backgroundTint="@color/primary"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Direct Test Panic Button -->
+        <Button
+            android:id="@+id/btnTestPanic"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="⚡ Test Panic Action (Simulate 3-Taps)"
+            android:textColor="@color/accent"
+            app:strokeColor="@color/accent"
+            android:layout_marginBottom="20dp" />
+
+        <!-- ChatGPT Token Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="0dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ChatGPT Session Token (Optional)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="4dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Optional: Required to automatically delete your latest chat via OpenAI's backend."
+                    android:text="Used for silent backend deletion if ChatGPT is minimized."
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
-                    android:layout_marginBottom="12dp" />
+                    android:layout_marginBottom="10dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
@@ -74,7 +247,7 @@
                         android:textColor="@color/text_primary"
                         android:inputType="textMultiLine"
                         android:maxLines="3"
-                        android:textSize="13sp" />
+                        android:textSize="12sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <Button
@@ -83,57 +256,9 @@
                     android:layout_height="wrap_content"
                     android:text="Save Token"
                     android:backgroundTint="@color/primary"
-                    android:layout_marginTop="10dp" />
+                    android:layout_marginTop="8dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Required Permissions"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <Button
-            android:id="@+id/btnOverlayPermission"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="1. Allow Display Over Other Apps"
-            android:backgroundTint="#2E7D32"
-            android:layout_marginBottom="10dp" />
-
-        <Button
-            android:id="@+id/btnAccessibilityPermission"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="2. Enable Accessibility Service"
-            android:backgroundTint="#0277BD"
-            android:layout_marginBottom="10dp" />
-
-        <Button
-            android:id="@+id/btnBatteryOptimization"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="3. Ignore Battery Optimization"
-            android:backgroundTint="#455A64"
-            android:layout_marginBottom="24dp" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#333333"
-            android:layout_marginBottom="24dp" />
-
-        <Button
-            android:id="@+id/btnToggleService"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="Start Panic Closer Guard"
-            android:backgroundTint="@color/accent"
-            android:textSize="16sp"
-            android:textStyle="bold" />
 
     </LinearLayout>
 </ScrollView>
