@@ -33,25 +33,26 @@ jobs:
       - name: Prepare APK Asset
         run: |
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/release/app-release.apk release-artifacts/QuickChatGPTCloser-v1.0.0.apk
+          TAG_NAME="${{ github.ref_name }}"
+          cp app/build/outputs/apk/release/app-release.apk release-artifacts/QuickChatGPTCloser-${TAG_NAME}.apk
 
       - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || 'v1.0.0' }}
-          name: Quick ChatGPT Closer ${{ github.ref_name || 'v1.0.0' }}
+          tag_name: ${{ github.ref_name }}
+          name: Quick ChatGPT Closer ${{ github.ref_name }}
           body: |
-            ## Quick ChatGPT Closer v1.0.0 🚀
+            ## Quick ChatGPT Closer ${{ github.ref_name }} 🚀
+
+            ### What's New in this update:
+            - **No Settings screen**: Tapping the corner trigger no longer opens Android Settings (Storage / Cache).
+            - **Seamless Automatic Closing**: Instantly exits ChatGPT directly to your home screen.
+            - **Automatic In-App Chat Deletion**: Clicks the conversation menu and confirms deletion automatically before dismissing.
+            - **Process Termination**: Background processes are cleared on exit.
 
             ### Download & Install:
-            - Download **`QuickChatGPTCloser-v1.0.0.apk`** below and open it on your Android phone.
-
-            ### Features:
-            - **Triple-tap Corner Gesture**: 90×90px touch zone in the top-right corner triggers the panic sequence.
-            - **Silent Last Chat Deletion**: Sends background API request to delete the latest conversation in ChatGPT.
-            - **Automated Force Stop**: Automates Settings to force close ChatGPT and returns straight to your home screen.
-            - **Background Guard**: Keeps running reliably as a foreground service with battery optimization exclusions.
-          files: release-artifacts/QuickChatGPTCloser-v1.0.0.apk
+            - Download the `.apk` attached below and install it on your device.
+          files: release-artifacts/*.apk
           draft: false
           prerelease: false
         env:

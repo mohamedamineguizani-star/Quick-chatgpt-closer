@@ -100,13 +100,15 @@ class CornerTriggerService : Service() {
         val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         val token = prefs.getString("chatgpt_token", "") ?: ""
 
-        serviceScope.launch {
-            // 1. Silent backend chat delete
-            ChatGptManager.deleteLastChat(token)
-
-            // 2. Automate Settings menu to force stop ChatGPT and return home
-            ChatGPTAutomatorService.triggerForceStop(applicationContext)
+        // 1. Silent backend chat delete in parallel if token is provided
+        if (token.isNotBlank()) {
+            serviceScope.launch {
+                ChatGptManager.deleteLastChat(token)
+            }
         }
+
+        // 2. Direct In-App deletion & Instant close to Home (No Settings screen!)
+        ChatGPTAutomatorService.executePanic(applicationContext)
     }
 
     private fun buildForegroundNotification(): Notification {
